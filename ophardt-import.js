@@ -1,3 +1,36 @@
+// Club member database business logic.
+
+const externalEncoding = 'latin1';
+
+function isActiveStatus(status) {
+    switch (status) {
+        case 'Aktivmitglied':
+        case 'Aktivmitglied (Ehepaar)':
+        case "Junior 1":
+        case "Junior 2":
+        case "Junior 2 (>20)":
+        case "Flüchtling":
+        case "Gastmitglied":
+        case "Ehrenmitglied":
+            return true;
+        default:
+            return false;
+    }
+}
+
+function shouldKeepExternal(row) {
+    return isActiveStatus(row['Status']) && row['Lizenz'] != 'Lizenz in anderem Club';
+}
+
+// Mappings from club member database to Ophardt.
+
+function externalToOphardt(row) {
+    row['gender'] = row['gender'] == 'weiblich' ? 'F' : 'M';
+    const nat = row['nationality1'];
+    row['nationality1'] = Object.hasOwn(countryMapping, nat) ? countryMapping[nat] : nat;
+    row['handed'] = row['handed'] == 'Links' ? 'L' : 'R';
+}
+
 const headerMapping = {
     'Vorname': 'firstname',
     'Nachname': 'lastname',
@@ -6,15 +39,6 @@ const headerMapping = {
     'Nationalität': 'nationality1',
     'Waffenarm': "handed"
 }
-
-const ophardtColumns = [
-    'firstname',
-    'lastname',
-    'dateofbirth',
-    'gender',
-    'nationality1',
-    'handed'
-];
 
 const countryMapping = {
     'Schweiz': 'SUI',
@@ -56,23 +80,29 @@ const countryMapping = {
     'Süd Korea': 'KOR'
 }
 
-function isActiveStatus(status) {
-    switch (status) {
-        case 'Aktivmitglied':
-        case 'Aktivmitglied (Ehepaar)':
-        case "Junior 1":
-        case "Junior 2":
-        case "Junior 2 (>20)":
-            return true;
-        default:
-            return false;
-    }
+// Ophardt business logic.
+
+const ophardtEncoding = "utf-16";
+
+const ophardtColumns = [
+    'firstname',
+    'lastname',
+    'dateofbirth',
+    'gender',
+    'nationality1',
+    'handed'
+];
+
+function shouldKeepOphardt(row) {
+    return row['active'] == 1;
 }
 
 function getKey(row) {
     key = row['lastname'] + row['firstname'] + row['dateofbirth'];
     return key.charAt(0).toUpperCase() + key.slice(1);
 }
+
+// No business logic below this point.
 
 function parseExternal(file) {
     return new Promise((resolve) => {
@@ -82,8 +112,8 @@ function parseExternal(file) {
                 header: true,
                 transformHeader: (header) =>
                     Object.hasOwn(headerMapping, header) ? headerMapping[header] : header,
-                encoding: 'latin1',
-                complete: (results) => { resolve(results) }
+                encoding: externalEncoding,
+                complete: (results) => { resolve(results.data) }
             }
         );
     })
@@ -95,11 +125,68 @@ function parseExisting(file) {
             file,
             {
                 header: true,
-                encoding: 'utf-16',
-                complete: (results) => { resolve(results) }
+                encoding: ophardtEncoding,
+                complete: (results) => { resolve(results.data) }
             }
         );
     })
+}
+
+const externalInput = document.getElementById('external');
+externalInput.addEventListener("input", processExternal);
+const externalMap = new Map();
+
+async function processExternal() {
+    const externalFile = externalInput.files[0];
+    const externalData = await parseExternal(externalFile);
+    externalData.forEach(row => {
+        if (shouldKeepExternal(row)) {
+            externalMap.set(getKey(row), row);
+        }
+    });
+    document.getElementById('stats-external').innerHTML = `
+        <p>Entries in club members file: ${externalData.length} Retained: ${externalMap.size}</p>
+    `;
+
+
+    document.getElementById('existing-div').removeAttribute('hidden');
+}
+
+const existingInput = document.getElementById('existing');
+existingInput.addEventListener("input", processExisting);
+const existingMap = new Map();
+
+async function processExisting() {
+    const existingFile = existingInput.files[0];
+    const existingData = await parseExisting(existingFile);
+
+    existingData.forEach(row => {
+        if (shouldKeepOphardt(row)) {
+            existingMap.set(getKey(row), row);
+        }
+    });
+    document.getElementById('stats-existing').innerHTML = `
+        <p>Entries in ophardt athletes file: ${existingData.length} Retained: ${existingMap.size}</p>
+    `;
+
+    compareFiles();
+}
+
+function compareFiles() {
+    const unmatchedExternalDiv = document.getElementById('unmatched-external');
+    const unmatchedExistingDiv = document.getElementById('unmatched-existing');
+
+    // Find unmatched entries
+    const unmatchedExternalEntries =
+        externalMap.values().filter(row => !existingMap.has(getKey(row))).toArray();
+    unmatchedExternalEntries.forEach(row => externalToOphardt(row));
+    const unmatchedExistingEntries =
+        existingMap.values().filter(row => !externalMap.has(getKey(row))).toArray();
+
+    unmatchedExternalDiv.innerHTML = '<h3>Unmatched Club Member Entries:</h3>';
+    outputUnmatched(unmatchedExternalEntries, unmatchedExternalDiv);
+    unmatchedExistingDiv.innerHTML = '<h3>Unmatched Ophardt Entries:</h3>';
+    outputUnmatched(unmatchedExistingEntries, unmatchedExistingDiv);
 }
 
 function outputUnmatched(unmatchedEntries, outputDIV) {
@@ -117,70 +204,6 @@ function outputUnmatched(unmatchedEntries, outputDIV) {
                 class="download-link">Download unmatched entries CSV</a>
         `;
     } else {
-        outputDIV.innerHTML = '<p>No unmatched entries found.</p>';
-    }
-}
-
-const externalInput = document.getElementById('external');
-const existingInput = document.getElementById('existing');
-
-externalInput.addEventListener("input", processExternal);
-existingInput.addEventListener("input", compareFiles);
-
-let externalData = undefined;
-let externalMap = new Map();
-
-async function processExternal() {
-    const externalFile = externalInput.files[0];
-    externalData = await parseExternal(externalFile);
-    externalData.data.forEach(row => {
-        externalMap.set(getKey(row), row);
-    });
-
-    document.getElementById('existing-div').removeAttribute('hidden');
-}
-
-async function compareFiles() {
-    const existingFile = existingInput.files[0];
-    const statisticsDiv = document.getElementById('statistics');
-    const results1Div = document.getElementById('results1');
-    const results2Div = document.getElementById('results2');
-
-    try {
-        const existingData = await parseExisting(existingFile);
-
-        const existingMap = new Map();
-        existingData.data.forEach(row => {
-            existingMap.set(getKey(row), row);
-        });
-
-        // Find unmatched entries
-        const unmatchedExternalEntries = externalData.data.filter(row => 
-            isActiveStatus(row['Status']) && row['Lizenz'] != 'Lizenz in anderem Club' && !existingMap.has(getKey(row))
-        );
-        unmatchedExternalEntries.forEach(row => {
-            row['gender'] = row['gender'] == 'weiblich' ? 'F' : 'M';
-            const nat = row['nationality1'];
-            row['nationality1'] = Object.hasOwn(countryMapping, nat) ? countryMapping[nat] : nat;
-            row['handed'] = row['handed'] == 'Links' ? 'L' : 'R';
-        })
-        const unmatchedExistingEntries = existingData.data.filter(row => 
-            row['active'] == 1 && !externalMap.has(getKey(row))
-        );
-
-        // Display statistics
-        statisticsDiv.innerHTML = `
-            <h3>Results:</h3>
-            <p>Entries in club members file: ${externalData.data.length}</p>
-            <p>Entries in ophardt file: ${existingData.data.length}</p>
-        `;
-
-        results1Div.innerHTML = '<h3>Unmatched Club Member Entries:</h3>';
-        outputUnmatched(unmatchedExternalEntries, results1Div);
-        results2Div.innerHTML = '<h3>Unmatched Ophardt Entries:</h3>';
-        outputUnmatched(unmatchedExistingEntries, results2Div);
-
-    } catch (error) {
-        results1Div.innerHTML = `<p style="color: red">Error: ${error.message}</p>`;
+        outputDIV.innerHTML += '<p>No unmatched entries found.</p>';
     }
 }
