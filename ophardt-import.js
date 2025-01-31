@@ -111,37 +111,43 @@ function outputUnmatched(unmatchedEntries, outputDIV) {
         const blob = new Blob([csvContent], { type: 'text/csv' });
         const url = URL.createObjectURL(blob);
         
-        outputDIV.innerHTML = `
-            <h3>Unmatched Club Member Entries:</h3>
+        outputDIV.innerHTML += `<pre>${csvContent}</pre>`;
+        outputDIV.innerHTML += `
             <a href="${url}" download="unmatched_entries.csv" 
                 class="download-link">Download unmatched entries CSV</a>
         `;
-        outputDIV.innerHTML += `<pre>${csvContent}</pre>`;
     } else {
         outputDIV.innerHTML = '<p>No unmatched entries found.</p>';
     }
 }
 
+const externalInput = document.getElementById('external');
+const existingInput = document.getElementById('existing');
+
+externalInput.addEventListener("input", processExternal);
+existingInput.addEventListener("input", compareFiles);
+
+let externalData = undefined;
+let externalMap = new Map();
+
+async function processExternal() {
+    const externalFile = externalInput.files[0];
+    externalData = await parseExternal(externalFile);
+    externalData.data.forEach(row => {
+        externalMap.set(getKey(row), row);
+    });
+
+    document.getElementById('existing-div').removeAttribute('hidden');
+}
+
 async function compareFiles() {
-    const externalFile = document.getElementById('external').files[0];
-    const existingFile = document.getElementById('existing').files[0];
+    const existingFile = existingInput.files[0];
     const statisticsDiv = document.getElementById('statistics');
     const results1Div = document.getElementById('results1');
     const results2Div = document.getElementById('results2');
 
-    if (!externalFile || !existingFile) {
-        alert('Please upload both CSV files');
-        return;
-    }
-
     try {
-        const externalData = await parseExternal(externalFile);
         const existingData = await parseExisting(existingFile);
-
-        const externalMap = new Map();
-        externalData.data.forEach(row => {
-            externalMap.set(getKey(row), row);
-        });
 
         const existingMap = new Map();
         existingData.data.forEach(row => {
@@ -167,11 +173,11 @@ async function compareFiles() {
             <h3>Results:</h3>
             <p>Entries in club members file: ${externalData.data.length}</p>
             <p>Entries in ophardt file: ${existingData.data.length}</p>
-            <p>Unmatched club member entries: ${unmatchedExternalEntries.length}</p>
-            <p>Unmatched ophardt entries: ${unmatchedExistingEntries.length}</p>
         `;
 
+        results1Div.innerHTML = '<h3>Unmatched Club Member Entries:</h3>';
         outputUnmatched(unmatchedExternalEntries, results1Div);
+        results2Div.innerHTML = '<h3>Unmatched Ophardt Entries:</h3>';
         outputUnmatched(unmatchedExistingEntries, results2Div);
 
     } catch (error) {

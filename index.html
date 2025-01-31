@@ -4,22 +4,20 @@
     <meta charset="UTF-8">
     <title>Ophardt People Importer</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
-    <script src="ophardt-import.js"></script>
+    <script src="ophardt-import.js" defer></script>
 </head>
 <body>
     <h1>Ophardt People Importer</h1>
     <div class="file-input">
-        <label for="external">Club Members CSV file:</label><br>
+        <label for="external">Club Members CSV:</label>
         <input type="file" id="external" accept=".csv">
     </div>
-    <div class="file-input">
-        <label for="existing">Ophardt CSV file:</label><br>
+    <div class="file-input" id="existing-div" hidden>
+        <label for="existing">Ophardt Athletes CSV:</label>
         <input type="file" id="existing" accept=".csv">
     </div>
-    <button onclick="compareFiles()" id="compareBtn">Compare Files</button>
     <div class="stats" id="statistics"></div>
     <div id="results1"></div>
     <div id="results2"></div>
-
 </body>
 </html>
