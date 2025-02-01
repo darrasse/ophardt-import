@@ -24,13 +24,7 @@ function shouldKeepExternal(row) {
 
 // Mappings from club member database to Ophardt.
 
-function externalToOphardt(row) {
-    row['gender'] = row['gender'] == 'weiblich' ? 'F' : 'M';
-    const nat = row['nationality1'];
-    row['nationality1'] = Object.hasOwn(countryMapping, nat) ? countryMapping[nat] : nat;
-    row['handed'] = row['handed'] == 'Links' ? 'L' : 'R';
-}
-
+const missingHeaders = new Array();
 const headerMapping = new Map([
     ['Vorname', 'firstname'],
     ['Nachname', 'lastname'],
@@ -40,45 +34,73 @@ const headerMapping = new Map([
     ['Waffenarm', 'handed'],
 ]);
 
-const countryMapping = {
-    'Schweiz': 'SUI',
-    'Deutschland': 'GER',
-    'Frankreich': 'FRA',
-    'Italien': 'ITA',
-    'Ungarn': 'HUN',
-    'Österreich': 'AUT',
-    'Niederlande': 'NED',
-    'Großbritannien': 'GBR',
-    'Polen': 'POL',
-    'USA': 'USA',
-    'Ukraine': 'UKR',
-    'Spanien': 'ESP',
-    'Griechenland': 'GRE',
-    'Rumänien': 'ROU',
-    'Kanada': 'CAN',
-    'Estland': 'EST',
-    'Russland': 'RUS',
-    'China': 'CHN',
-    'Schweden': 'SWE',
-    'Slowakei': 'SVK',
-    'Indien': 'IND',
-    'Weißrussland': 'BLR',
-    'Kroatien': 'CRO',
-    'Hongkong': 'HKG',
-    'Kirgisistan': 'KGZ',
-    'Portugal': 'POR',
-    'Tschechien': 'CZE',
-    'Südafrika': 'RSA',
-    'Litauen': 'LTU',
-    'Finnland': 'FIN',
-    'Luxemburg': 'LUX',
-    'Norwegen': 'NOR',
-    'Singapur': 'SGP',
-    'Irland': 'IRL',
-    'Irak': 'IRQ',
-    'Libanon': 'LBN',
-    'Süd Korea': 'KOR'
-}
+const genders = {
+    'header': 'gender',
+    'missing': new Map(),
+    'empty': 0,
+    'map': new Map([
+        ['weiblich', 'F'],
+        ['männlich', 'M'],
+    ]),
+};
+
+const countries = {
+    'header': 'nationality1',
+    'missing': new Map(),
+    'empty': 0,
+    'map': new Map([
+        ['Österreich', 'AUT'],
+        ['Belgien', 'BEL'],
+        ['Weißrussland', 'BLR'],
+        ['Kanada', 'CAN'],
+        ['China', 'CHN'],
+        ['Kroatien', 'CRO'],
+        ['Tschechien', 'CZE'],
+        ['Spanien', 'ESP'],
+        ['Estland', 'EST'],
+        ['Finnland', 'FIN'],
+        ['Frankreich', 'FRA'],
+        ['Großbritannien', 'GBR'],
+        ['Deutschland', 'GER'],
+        ['Griechenland', 'GRE'],
+        ['Hongkong', 'HKG'],
+        ['Ungarn', 'HUN'],
+        ['Indien', 'IND'],
+        ['Irland', 'IRL'],
+        ['Irak', 'IRQ'],
+        ['Italien', 'ITA'],
+        ['Kirgisistan', 'KGZ'],
+        ['Süd Korea', 'KOR'],
+        ['Libanon', 'LBN'],
+        ['Litauen', 'LTU'],
+        ['Luxemburg', 'LUX'],
+        ['Niederlande', 'NED'],
+        ['Norwegen', 'NOR'],
+        ['Polen', 'POL'],
+        ['Portugal', 'POR'],
+        ['Rumänien', 'ROU'],
+        ['Südafrika', 'RSA'],
+        ['Russland', 'RUS'],
+        ['Singapur', 'SGP'],
+        ['Schweiz', 'SUI'],
+        ['Slowakei', 'SVK'],
+        ['Schweden', 'SWE'],
+        ['Ukraine', 'UKR'],
+        ['USA', 'USA'],
+    ]),
+};
+
+const handed = {
+    'header': 'handed',
+    'missing': new Map(),
+    'empty': 0,
+    'map': new Map([
+        ['Links', 'L'],
+        ['Rechts', 'R'],
+    ]),
+};
+
+const mappings = [ genders, countries, handed ];
 
 // Ophardt business logic.
 
@@ -164,7 +186,7 @@ async function processExternalHeaders() {
         }
     });
     if (columnsPresent.length < ophardtColumns.length) {
-        const missingHeaders = ophardtColumns.filter(header => !columnsPresent.includes(header));
+        missingHeaders = ophardtColumns.filter(header => !columnsPresent.includes(header));
         document.getElementById('stats-external').innerHTML = `
             <p>The following columns were not found in the club members file: ${missingHeaders}</p>
             <p>The following columns from the club members file were unmatched: ${unmatchedHeaders}</p>
@@ -174,17 +196,44 @@ async function processExternalHeaders() {
     }
 }
 
+function applyMapping(row, mapping) {
+    const column = mapping['header'];
+    const value = row[column];
+    if (value == '') {
+        mapping['empty'] += 1;
+    } else if (mapping['map'].has(value)) {
+        row[column] = mapping['map'].get(value);
+    } else {
+        mapping['missing'].set(value, (mapping['missing'].get(value) || 0) + 1);
+    }
+}
+
 async function processExternalContent() {
     const externalFile = externalInput.files[0];
     const externalData = await parseExternal(externalFile);
     externalData.forEach(row => {
         if (shouldKeepExternal(row)) {
+            mappings.forEach(mapping => {applyMapping(row, mapping);});
             externalMap.set(getKey(row), row);
         }
     });
-    document.getElementById('stats-external').innerHTML = `
+    const statsDiv = document.getElementById('stats-external');
+    statsDiv.innerHTML = `
         <p>Entries in club members file: ${externalData.length} Retained: ${externalMap.size}</p>
     `;
+    mappings.forEach(mapping => {
+        if (mapping['missing'].size > 0) {
+            statsDiv.innerHTML += `
+                <p>The following ${mapping['header']} values were not found
+                in the mapping: ${mapping['missing'].keys().toArray()}</p>
+            `
+        }
+        if (mapping['empty'] > 0) {
+            statsDiv.innerHTML += `
+                <p>${mapping['empty']} ${mapping['header']} values were empty</p>
+            `
+        }
+    });
 
     document.getElementById('existing-div').removeAttribute('hidden');
 }
@@ -216,7 +265,6 @@ function compareFiles() {
     // Find unmatched entries
     const unmatchedExternalEntries =
         externalMap.values().filter(row => !existingMap.has(getKey(row))).toArray();
-    unmatchedExternalEntries.forEach(row => externalToOphardt(row));
     const unmatchedExistingEntries =
         existingMap.values().filter(row => !externalMap.has(getKey(row))).toArray();
 
