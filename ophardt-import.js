@@ -1,88 +1,20 @@
 // Club member database parameters.
 
-const externalEncoding = 'latin1';
-
-function isActiveStatus(status) {
-    switch (status) {
-        case 'Aktivmitglied':
-        case 'Aktivmitglied (Ehepaar)':
-        case "Junior 1":
-        case "Junior 2":
-        case "Junior 2 (>20)":
-        case "Flüchtling":
-        case "Gastmitglied":
-        case "Ehrenmitglied":
-            return true;
-        default:
-            return false;
-    }
-}
+var externalEncoding = 'utf-8';
 
 function shouldKeepExternal(row) {
-    return isActiveStatus(row['Status']) && row['Lizenz'] != 'Lizenz in anderem Club';
+    return true;
 }
 
 // Mappings from club member database to Ophardt.
 
-const headerMapping = new Map([
-    ['Vorname', 'firstname'],
-    ['Nachname', 'lastname'],
-    ['Geburtsdatum', 'dateofbirth'],
-    ['Geschlecht', 'gender'],
-    ['Nationalität', 'nationality1'],
-    ['Waffenarm', 'handed'],
-]);
+var headerMapping = new Map();
 
-const genderMapping = new Map([
-    ['weiblich', 'F'],
-    ['männlich', 'M'],
-]);
+var genderMapping = new Map();
 
-const countryMapping = new Map([
-    ['Österreich', 'AUT'],
-    ['Belgien', 'BEL'],
-    ['Weißrussland', 'BLR'],
-    ['Kanada', 'CAN'],
-    ['China', 'CHN'],
-    ['Kroatien', 'CRO'],
-    ['Tschechien', 'CZE'],
-    ['Spanien', 'ESP'],
-    ['Estland', 'EST'],
-    ['Finnland', 'FIN'],
-    ['Frankreich', 'FRA'],
-    ['Großbritannien', 'GBR'],
-    ['Deutschland', 'GER'],
-    ['Griechenland', 'GRE'],
-    ['Hongkong', 'HKG'],
-    ['Ungarn', 'HUN'],
-    ['Indien', 'IND'],
-    ['Irland', 'IRL'],
-    ['Irak', 'IRQ'],
-    ['Italien', 'ITA'],
-    ['Kirgisistan', 'KGZ'],
-    ['Süd Korea', 'KOR'],
-    ['Libanon', 'LBN'],
-    ['Litauen', 'LTU'],
-    ['Luxemburg', 'LUX'],
-    ['Niederlande', 'NED'],
-    ['Norwegen', 'NOR'],
-    ['Polen', 'POL'],
-    ['Portugal', 'POR'],
-    ['Rumänien', 'ROU'],
-    ['Südafrika', 'RSA'],
-    ['Russland', 'RUS'],
-    ['Singapur', 'SGP'],
-    ['Schweiz', 'SUI'],
-    ['Slowakei', 'SVK'],
-    ['Schweden', 'SWE'],
-    ['Ukraine', 'UKR'],
-    ['USA', 'USA'],
-]);
+var countryMapping = new Map();
 
-const handedMapping = new Map([
-    ['Links', 'L'],
-    ['Rechts', 'R'],
-]);
+var handedMapping = new Map();
 
 // Ophardt parameters.
 
@@ -97,27 +29,30 @@ const ophardtColumns = [
     'handed',
 ];
 
-const mappings = [
-    {
+const mappings = new Array();
+
+// We don't initialize these right away, as we are likely to override the Maps
+// by loading a script that sets a values for a given club managament software.
+function initMappings() {
+    mappings.push({
         'header': 'gender',
         'missing': new Map(),
         'empty': 0,
         'map': genderMapping,
-    },
-    {
+    });
+    mappings.push({
         'header': 'nationality1',
         'missing': new Map(),
         'empty': 0,
         'map': countryMapping,
-    },
-    {
+    });
+    mappings.push({
         'header': 'handed',
         'missing': new Map(),
         'empty': 0,
         'map': handedMapping,
-    },
-];
-
+    });
+}
 
 function shouldKeepOphardt(row) {
     return row['active'] == 1;
@@ -192,6 +127,7 @@ async function processExternalHeaders() {
     if (columnsPresent.length < ophardtColumns.length) {
         addMissingHeaderForm(columnsPresent, unmatchedHeaders);
     } else {
+        initMappings();
         processExternalContent();
     }
 }
