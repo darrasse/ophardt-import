@@ -24,7 +24,6 @@ function shouldKeepExternal(row) {
 
 // Mappings from club member database to Ophardt.
 
-const missingHeaders = new Array();
 const headerMapping = new Map([
     ['Vorname', 'firstname'],
     ['Nachname', 'lastname'],
@@ -186,14 +185,56 @@ async function processExternalHeaders() {
         }
     });
     if (columnsPresent.length < ophardtColumns.length) {
-        missingHeaders = ophardtColumns.filter(header => !columnsPresent.includes(header));
-        document.getElementById('stats-external').innerHTML = `
-            <p>The following columns were not found in the club members file: ${missingHeaders}</p>
-            <p>The following columns from the club members file were unmatched: ${unmatchedHeaders}</p>
-        `;
+        addMissingHeaderForm(columnsPresent, unmatchedHeaders);
     } else {
         processExternalContent();
     }
+}
+
+function addMissingHeaderForm(columnsPresent, unmatchedHeaders) {
+    const form = document.getElementById('missing-headers-form');
+    const datalist = document.createElement('datalist');
+    datalist.id = 'unmatched-headers';
+    unmatchedHeaders.forEach(header => {
+        const option = document.createElement('option');
+        option.value = header;
+        datalist.appendChild(option);
+    });
+    form.appendChild(datalist);
+    const missingHeaders = ophardtColumns.filter(header => !columnsPresent.includes(header));
+    missingHeaders.forEach(header => {
+        const label = document.createElement('label');
+        label.textContent = header + ': ';
+        label.htmlFor = 'missing-header-' + header;
+        const input = document.createElement('input');
+        input.setAttribute('list', 'unmatched-headers');
+        input.id = 'missing-header-' + header;
+        input.name = header;
+        const container = document.createElement('div');
+        container.appendChild(label);
+        container.appendChild(input);
+        form.appendChild(container);
+    });
+    const submit = document.createElement('button');
+    submit.type = 'submit';
+    submit.textContent = 'Reprocess';
+    form.appendChild(submit);
+    form.addEventListener('submit', event => {
+        event.preventDefault();
+        let stillMissing = false;
+        missingHeaders.forEach(header => {
+            value = document.getElementById('missing-header-' + header).value;
+            if (value == '') {
+                stillMissing = true;
+            }
+            headerMapping.set(value, header);
+        });
+        if (!stillMissing) {
+            form.innerHTML = '';
+            processExternalHeaders();
+        }
+    });
+    document.getElementById('stats-external').appendChild(form);
 }
 
 function applyMapping(row, mapping) {
