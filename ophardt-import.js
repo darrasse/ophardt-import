@@ -1,4 +1,4 @@
-// Club member database business logic.
+// Club member database parameters.
 
 const externalEncoding = 'latin1';
 
@@ -33,75 +33,58 @@ const headerMapping = new Map([
     ['Waffenarm', 'handed'],
 ]);
 
-const genders = {
-    'header': 'gender',
-    'missing': new Map(),
-    'empty': 0,
-    'map': new Map([
-        ['weiblich', 'F'],
-        ['männlich', 'M'],
-    ]),
-};
+const genderMapping = new Map([
+    ['weiblich', 'F'],
+    ['männlich', 'M'],
+]);
 
-const countries = {
-    'header': 'nationality1',
-    'missing': new Map(),
-    'empty': 0,
-    'map': new Map([
-        ['Österreich', 'AUT'],
-        ['Belgien', 'BEL'],
-        ['Weißrussland', 'BLR'],
-        ['Kanada', 'CAN'],
-        ['China', 'CHN'],
-        ['Kroatien', 'CRO'],
-        ['Tschechien', 'CZE'],
-        ['Spanien', 'ESP'],
-        ['Estland', 'EST'],
-        ['Finnland', 'FIN'],
-        ['Frankreich', 'FRA'],
-        ['Großbritannien', 'GBR'],
-        ['Deutschland', 'GER'],
-        ['Griechenland', 'GRE'],
-        ['Hongkong', 'HKG'],
-        ['Ungarn', 'HUN'],
-        ['Indien', 'IND'],
-        ['Irland', 'IRL'],
-        ['Irak', 'IRQ'],
-        ['Italien', 'ITA'],
-        ['Kirgisistan', 'KGZ'],
-        ['Süd Korea', 'KOR'],
-        ['Libanon', 'LBN'],
-        ['Litauen', 'LTU'],
-        ['Luxemburg', 'LUX'],
-        ['Niederlande', 'NED'],
-        ['Norwegen', 'NOR'],
-        ['Polen', 'POL'],
-        ['Portugal', 'POR'],
-        ['Rumänien', 'ROU'],
-        ['Südafrika', 'RSA'],
-        ['Russland', 'RUS'],
-        ['Singapur', 'SGP'],
-        ['Schweiz', 'SUI'],
-        ['Slowakei', 'SVK'],
-        ['Schweden', 'SWE'],
-        ['Ukraine', 'UKR'],
-        ['USA', 'USA'],
-    ]),
-};
+const countryMapping = new Map([
+    ['Österreich', 'AUT'],
+    ['Belgien', 'BEL'],
+    ['Weißrussland', 'BLR'],
+    ['Kanada', 'CAN'],
+    ['China', 'CHN'],
+    ['Kroatien', 'CRO'],
+    ['Tschechien', 'CZE'],
+    ['Spanien', 'ESP'],
+    ['Estland', 'EST'],
+    ['Finnland', 'FIN'],
+    ['Frankreich', 'FRA'],
+    ['Großbritannien', 'GBR'],
+    ['Deutschland', 'GER'],
+    ['Griechenland', 'GRE'],
+    ['Hongkong', 'HKG'],
+    ['Ungarn', 'HUN'],
+    ['Indien', 'IND'],
+    ['Irland', 'IRL'],
+    ['Irak', 'IRQ'],
+    ['Italien', 'ITA'],
+    ['Kirgisistan', 'KGZ'],
+    ['Süd Korea', 'KOR'],
+    ['Libanon', 'LBN'],
+    ['Litauen', 'LTU'],
+    ['Luxemburg', 'LUX'],
+    ['Niederlande', 'NED'],
+    ['Norwegen', 'NOR'],
+    ['Polen', 'POL'],
+    ['Portugal', 'POR'],
+    ['Rumänien', 'ROU'],
+    ['Südafrika', 'RSA'],
+    ['Russland', 'RUS'],
+    ['Singapur', 'SGP'],
+    ['Schweiz', 'SUI'],
+    ['Slowakei', 'SVK'],
+    ['Schweden', 'SWE'],
+    ['Ukraine', 'UKR'],
+    ['USA', 'USA'],
+]);
 
-const handed = {
-    'header': 'handed',
-    'missing': new Map(),
-    'empty': 0,
-    'map': new Map([
-        ['Links', 'L'],
-        ['Rechts', 'R'],
-    ]),
-};
+const handedMapping = new Map([
+    ['Links', 'L'],
+    ['Rechts', 'R'],
+]);
 
-const mappings = [ genders, countries, handed ];
-
-// Ophardt business logic.
+// Ophardt parameters.
 
 const ophardtEncoding = "utf-16";
 
@@ -114,6 +97,28 @@ const ophardtColumns = [
     'handed',
 ];
 
+const mappings = [
+    {
+        'header': 'gender',
+        'missing': new Map(),
+        'empty': 0,
+        'map': genderMapping,
+    },
+    {
+        'header': 'nationality1',
+        'missing': new Map(),
+        'empty': 0,
+        'map': countryMapping,
+    },
+    {
+        'header': 'handed',
+        'missing': new Map(),
+        'empty': 0,
+        'map': handedMapping,
+    },
+];
+
+
 function shouldKeepOphardt(row) {
     return row['active'] == 1;
 }
@@ -123,7 +128,7 @@ function getKey(row) {
     return key.charAt(0).toUpperCase() + key.slice(1);
 }
 
-// No business logic below this point.
+// Core logic.
 
 function parseExternalHeaders(file) {
     return new Promise((resolve) => {
@@ -303,7 +308,6 @@ function compareFiles() {
     const unmatchedExternalDiv = document.getElementById('unmatched-external');
     const unmatchedExistingDiv = document.getElementById('unmatched-existing');
 
-    // Find unmatched entries
     const unmatchedExternalEntries =
         externalMap.values().filter(row => !existingMap.has(getKey(row))).toArray();
     const unmatchedExistingEntries =
