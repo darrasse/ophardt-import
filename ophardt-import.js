@@ -31,14 +31,14 @@ function externalToOphardt(row) {
     row['handed'] = row['handed'] == 'Links' ? 'L' : 'R';
 }
 
-const headerMapping = {
-    'Vorname': 'firstname',
-    'Nachname': 'lastname',
-    'Geburtsdatum': 'dateofbirth',
-    'Geschlecht': 'gender',
-    'Nationalität': 'nationality1',
-    'Waffenarm': "handed"
-}
+const headerMapping = new Map([
+    ['Vorname', 'firstname'],
+    ['Nachname', 'lastname'],
+    ['Geburtsdatum', 'dateofbirth'],
+    ['Geschlecht', 'gender'],
+    ['Nationalität', 'nationality1'],
+    ['Waffenarm', 'handed'],
+]);
 
 const countryMapping = {
     'Schweiz': 'SUI',
@@ -90,7 +90,7 @@ const ophardtColumns = [
     'dateofbirth',
     'gender',
     'nationality1',
-    'handed'
+    'handed',
 ];
 
 function shouldKeepOphardt(row) {
@@ -104,6 +104,19 @@ function getKey(row) {
 
 // No business logic below this point.
 
+function parseExternalHeaders(file) {
+    return new Promise((resolve) => {
+        Papa.parse(
+            file,
+            {
+                preview: 1,
+                encoding: externalEncoding,
+                complete: (results) => { resolve(results.data[0]) }
+            }
+        );
+    })
+}
+
 function parseExternal(file) {
     return new Promise((resolve) => {
         Papa.parse(
@@ -111,7 +124,7 @@ function parseExternal(file) {
             {
                 header: true,
                 transformHeader: (header) =>
-                    Object.hasOwn(headerMapping, header) ? headerMapping[header] : header,
+                    headerMapping.has(header) ? headerMapping.get(header) : header,
                 encoding: externalEncoding,
                 complete: (results) => { resolve(results.data) }
             }
@@ -133,10 +146,35 @@ function parseExisting(file) {
 }
 
 const externalInput = document.getElementById('external');
-externalInput.addEventListener("input", processExternal);
+externalInput.addEventListener("input", processExternalHeaders);
 const externalMap = new Map();
 
-async function processExternal() {
+async function processExternalHeaders() {
+    const externalFile = externalInput.files[0];
+    const externalHeaders = await parseExternalHeaders(externalFile);
+    const columnsPresent = new Array();
+    const unmatchedHeaders = new Array();
+    externalHeaders.forEach(header => {
+        if (ophardtColumns.includes(header)) {
+            columnsPresent.push(header);
+        } else if (headerMapping.has(header)) {
+            columnsPresent.push(headerMapping.get(header));
+        } else {
+            unmatchedHeaders.push(header);
+        }
+    });
+    if (columnsPresent.length < ophardtColumns.length) {
+        const missingHeaders = ophardtColumns.filter(header => !columnsPresent.includes(header));
+        document.getElementById('stats-external').innerHTML = `
+            <p>The following columns were not found in the club members file: ${missingHeaders}</p>
+            <p>The following columns from the club members file were unmatched: ${unmatchedHeaders}</p>
+        `;
+    } else {
+        processExternalContent();
+    }
+}
+
+async function processExternalContent() {
     const externalFile = externalInput.files[0];
     const externalData = await parseExternal(externalFile);
     externalData.forEach(row => {
@@ -147,7 +185,6 @@ async function processExternal() {
     document.getElementById('stats-external').innerHTML = `
         <p>Entries in club members file: ${externalData.length} Retained: ${externalMap.size}</p>
     `;
-
 
     document.getElementById('existing-div').removeAttribute('hidden');
 }
